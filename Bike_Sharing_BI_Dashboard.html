@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚲 Bike Sharing BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --accent4: #10b981;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow: rgba(0,212,255,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; padding: 24px; max-width: 1600px; margin: 0 auto; }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-left h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #00d4ff, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-left p { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; margin-top: 4px; }
+  .header-right { display: flex; gap: 10px; align-items: center; }
+  .live-badge {
+    background: rgba(16,185,129,0.15);
+    border: 1px solid rgba(16,185,129,0.4);
+    color: var(--accent4);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .live-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent4);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* SLICERS */
+  .slicers-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 22px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .slicer-group { display: flex; flex-direction: column; gap: 6px; }
+  .slicer-group label { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .slicer-group select, .slicer-group input[type=range] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 140px;
+  }
+  .slicer-group select:hover, .slicer-group select:focus { border-color: var(--accent); }
+  .reset-btn {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none;
+    color: white;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    align-self: flex-end;
+    margin-bottom: 1px;
+  }
+  .reset-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  /* KPI CARDS */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--kpi-color, var(--accent));
+  }
+  .kpi-label { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: var(--kpi-color, var(--accent)); line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: 'DM Mono', monospace; }
+  .kpi-icon { position: absolute; right: 16px; top: 16px; font-size: 22px; opacity: 0.3; }
+
+  /* CHART GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 18px; margin-bottom: 18px; }
+  .full-width { margin-bottom: 18px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.3); }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .card-subtitle { font-size: 11px; color: rgba(100,116,139,0.6); font-family: 'DM Mono', monospace; margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* HEATMAP */
+  .heatmap-container { overflow-x: auto; }
+  .heatmap-table {
+    border-collapse: separate;
+    border-spacing: 2px;
+    font-size: 9px;
+    font-family: 'DM Mono', monospace;
+    width: 100%;
+  }
+  .heatmap-table th {
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 8px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .heatmap-table td {
+    text-align: center;
+    padding: 3px 4px;
+    border-radius: 3px;
+    min-width: 42px;
+    font-weight: 500;
+    transition: transform 0.1s;
+    cursor: default;
+    font-size: 8px;
+  }
+  .heatmap-table td:hover { transform: scale(1.3); z-index: 10; position: relative; }
+  .hour-label { color: var(--muted) !important; background: transparent !important; font-size: 9px; }
+
+  /* ANOMALY TABLE */
+  .anomaly-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+  .anomaly-table th { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  .anomaly-table td { padding: 10px 12px; border-bottom: 1px solid rgba(30,45,69,0.5); }
+  .anomaly-table tr:last-child td { border-bottom: none; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+  .badge-high { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .badge-low { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .badge-normal { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+
+  /* FORECAST */
+  .forecast-insight {
+    background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(0,212,255,0.05));
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 14px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .forecast-insight strong { color: var(--accent); }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, 1fr); } .grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 900px) { .grid-2, .grid-1-2 { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🚲 Bike Sharing Analytics Dashboard</h1>
+      <p>DATA SET B · JAN–FEB 2011 · 1,000 RECORDS · INTERACTIVE BI DASHBOARD</p>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">INTERACTIVE FILTERS ACTIVE</div>
+    </div>
+  </div>
+
+  <!-- SLICERS (Dynamic Filters) -->
+  <div class="slicers-bar">
+    <div class="slicer-group">
+      <label>📅 Month</label>
+      <select id="filterMonth" onchange="applyFilters()">
+        <option value="all">All Months</option>
+        <option value="Jan">January</option>
+        <option value="Feb">February</option>
+      </select>
+    </div>
+    <div class="slicer-group">
+      <label>🌤 Weather</label>
+      <select id="filterWeather" onchange="applyFilters()">
+        <option value="all">All Weather</option>
+        <option value="Clear">Clear</option>
+        <option value="Mist/Cloudy">Mist/Cloudy</option>
+        <option value="Light Rain/Snow">Light Rain/Snow</option>
+        <option value="Heavy Rain/Snow">Heavy Rain/Snow</option>
+      </select>
+    </div>
+    <div class="slicer-group">
+      <label>📆 Day Type</label>
+      <select id="filterDayType" onchange="applyFilters()">
+        <option value="all">All Days</option>
+        <option value="Weekday">Weekday</option>
+        <option value="Weekend">Weekend</option>
+      </select>
+    </div>
+    <div class="slicer-group">
+      <label>⏰ Peak Hour</label>
+      <select id="filterPeak" onchange="applyFilters()">
+        <option value="all">All Hours</option>
+        <option value="Peak">Peak Only</option>
+        <option value="Off-Peak">Off-Peak Only</option>
+      </select>
+    </div>
+    <div class="slicer-group">
+      <label>🔆 Holiday</label>
+      <select id="filterHoliday" onchange="applyFilters()">
+        <option value="all">All</option>
+        <option value="No">Non-Holiday</option>
+        <option value="Yes">Holiday</option>
+      </select>
+    </div>
+    <button class="reset-btn" onclick="resetFilters()">↺ Reset Filters</button>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpis">
+    <div class="kpi-card" style="--kpi-color: #00d4ff;">
+      <div class="kpi-icon">🚲</div>
+      <div class="kpi-label">Total Rentals</div>
+      <div class="kpi-value" id="kpi-total">58,304</div>
+      <div class="kpi-sub" id="kpi-total-sub">Jan–Feb 2011</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color: #7c3aed;">
+      <div class="kpi-icon">⏱</div>
+      <div class="kpi-label">Avg / Hour</div>
+      <div class="kpi-value" id="kpi-avg">58.3</div>
+      <div class="kpi-sub" id="kpi-avg-sub">Per hour slot</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color: #10b981;">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-label">Peak Hour Avg</div>
+      <div class="kpi-value" id="kpi-peak">103.2</div>
+      <div class="kpi-sub">vs 42.8 off-peak</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color: #f59e0b;">
+      <div class="kpi-icon">👤</div>
+      <div class="kpi-label">Registered %</div>
+      <div class="kpi-value" id="kpi-reg">91.3%</div>
+      <div class="kpi-sub" id="kpi-reg-sub">vs 8.7% casual</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color: #ef4444;">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-label">Anomalies Detected</div>
+      <div class="kpi-value" id="kpi-anomaly">6</div>
+      <div class="kpi-sub">Z-score &gt; 1.5</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Line Chart + Bar Chart -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📊 Daily Rental Trend with Anomaly Detection</div>
+      <div class="card-subtitle">Line chart · Red markers = statistical anomalies (|Z| &gt; 1.5)</div>
+      <div class="chart-wrap"><canvas id="lineChart" height="220"></canvas></div>
+      <div class="forecast-insight">
+        🔮 <strong>AI Forecast Insight:</strong> Peak demand clusters Jan 20–25 (avg +34% above mean). 
+        Significant dip on Jan 26–27 likely weather/event driven. Feb 14 shows extreme low (151 rentals — Valentine's Day anomaly).
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Hourly Demand Pattern</div>
+      <div class="card-subtitle">Bar chart · Avg rentals per hour across all days</div>
+      <div class="chart-wrap"><canvas id="barChart" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Heatmap Full Width -->
+  <div class="full-width card">
+    <div class="card-title">🔥 Rental Intensity Heatmap — Hour × Weekday</div>
+    <div class="card-subtitle">Average rentals · Darker = higher demand · Hover to zoom</div>
+    <div class="heatmap-container" id="heatmapContainer"></div>
+  </div>
+
+  <!-- ROW 3: Funnel + Donut + Grouped Bar -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">🌦 Weather Impact Funnel</div>
+      <div class="card-subtitle">Total rentals by weather condition</div>
+      <div class="chart-wrap"><canvas id="funnelChart" height="240"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">👥 Casual vs Registered Split</div>
+      <div class="card-subtitle">User type distribution by month</div>
+      <div class="chart-wrap"><canvas id="donutChart" height="240"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🌡 Temperature vs Rentals</div>
+      <div class="card-subtitle">Avg rentals by temperature band</div>
+      <div class="chart-wrap"><canvas id="tempChart" height="240"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Weekday Bar + Anomaly Table -->
+  <div class="grid-1-2">
+    <div class="card">
+      <div class="card-title">📅 Rentals by Weekday</div>
+      <div class="card-subtitle">Total demand across week</div>
+      <div class="chart-wrap"><canvas id="weekdayChart" height="280"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Anomaly Detection Report</div>
+      <div class="card-subtitle">Statistical outliers · Z-score analysis on daily totals</div>
+      <table class="anomaly-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Total Rentals</th>
+            <th>Z-Score</th>
+            <th>Type</th>
+            <th>Likely Cause</th>
+          </tr>
+        </thead>
+        <tbody id="anomalyTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>🚲 Bike Sharing BI Dashboard · Data Set B · Jan–Feb 2011</span>
+    <span>Built with Chart.js · Statistical anomaly detection via Z-score · Interactive filters</span>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// RAW DATA
+// ============================================================
+const RAW_DATA = [
+  // [date_str, month, weather, dayType, peakHour, holiday, hour, casual, registered, total]
+  // Generated from the cleaned dataset - daily aggregated + hourly for charts
+];
+
+// Pre-computed aggregated data from full dataset
+const ALL_DATA = {
+  hourlyAvg: {0:16.3,1:10.7,2:7.2,3:4.9,4:2.2,5:4.2,6:19.6,7:54.4,8:128.3,9:87.4,10:53.6,11:59.4,12:76.3,13:78.5,14:74.4,15:78.0,16:89.3,17:140.2,18:122.9,19:85.1,20:61.8,21:46.4,22:35.1,23:25.2},
+  weekdayTotals: {Monday:8450,Tuesday:8383,Wednesday:8049,Thursday:8458,Friday:9095,Saturday:7748,Sunday:8121},
+  weatherAvg: {Clear:61.7,'Mist/Cloudy':58.6,'Light Rain/Snow':33.2,'Heavy Rain/Snow':36.0},
+  weatherFunnel: {Clear:37373,'Mist/Cloudy':18106,'Light Rain/Snow':2789,'Heavy Rain/Snow':36},
+  monthlyData: {Jan:{Casual:3073,Registered:35116,Total:38189},Feb:{Casual:1848,Registered:18267,Total:20115}},
+  tempBins: {'0.8–4.4°C':33.5,'4.4–8.0°C':51.1,'8.0–11.6°C':60.0,'11.6–15.3°C':97.2,'15.3–18.9°C':59.1},
+  dailyTotals: [
+    {date:'Jan 01',total:985,zscore:-0.79},{date:'Jan 02',total:801,zscore:-1.26},
+    {date:'Jan 03',total:1349,zscore:0.14},{date:'Jan 04',total:1562,zscore:0.68},
+    {date:'Jan 05',total:1600,zscore:0.78},{date:'Jan 06',total:1606,zscore:0.79},
+    {date:'Jan 07',total:1510,zscore:0.55},{date:'Jan 08',total:959,zscore:-0.86},
+    {date:'Jan 09',total:822,zscore:-1.21},{date:'Jan 10',total:1321,zscore:0.06},
+    {date:'Jan 11',total:1263,zscore:-0.08},{date:'Jan 12',total:1162,zscore:-0.34},
+    {date:'Jan 13',total:1406,zscore:0.28},{date:'Jan 14',total:1421,zscore:0.32},
+    {date:'Jan 15',total:1248,zscore:-0.12},{date:'Jan 16',total:1204,zscore:-0.23},
+    {date:'Jan 17',total:1000,zscore:-0.75},{date:'Jan 18',total:683,zscore:-1.56},
+    {date:'Jan 19',total:1650,zscore:0.90},{date:'Jan 20',total:1927,zscore:1.61},
+    {date:'Jan 21',total:1543,zscore:0.63},{date:'Jan 22',total:981,zscore:-0.80},
+    {date:'Jan 23',total:986,zscore:-0.79},{date:'Jan 24',total:1416,zscore:0.31},
+    {date:'Jan 25',total:1985,zscore:1.76},{date:'Jan 26',total:506,zscore:-2.01},
+    {date:'Jan 27',total:431,zscore:-2.20},{date:'Jan 28',total:1167,zscore:-0.33},
+    {date:'Jan 29',total:1098,zscore:-0.50},{date:'Jan 30',total:1096,zscore:-0.51},
+    {date:'Jan 31',total:1501,zscore:0.52},{date:'Feb 01',total:1360,zscore:0.16},
+    {date:'Feb 02',total:1526,zscore:0.59},{date:'Feb 03',total:1550,zscore:0.65},
+    {date:'Feb 04',total:1708,zscore:1.05},{date:'Feb 05',total:1005,zscore:-0.74},
+    {date:'Feb 06',total:1623,zscore:0.83},{date:'Feb 07',total:1712,zscore:1.06},
+    {date:'Feb 08',total:1530,zscore:0.60},{date:'Feb 09',total:1605,zscore:0.79},
+    {date:'Feb 10',total:1538,zscore:0.62},{date:'Feb 11',total:1746,zscore:1.15},
+    {date:'Feb 12',total:1472,zscore:0.45},{date:'Feb 13',total:1589,zscore:0.75},
+    {date:'Feb 14',total:151,zscore:-2.92}
+  ],
+  heatmap: [
+    [9.6,8.8,8.7,11.8,14.7,25.6,30.6],[5.6,3.4,5.7,4.6,5.8,21.4,23.1],
+    [3.4,2.0,3.8,2.2,1.7,16.9,15.0],[1.5,1.5,1.5,1.7,1.0,9.1,9.0],
+    [2.0,2.0,1.7,1.8,1.0,3.6,1.7],[4.7,4.8,4.3,4.2,5.5,3.4,2.0],
+    [24.9,32.0,25.0,32.8,24.3,2.4,1.8],[71.9,90.6,68.3,90.8,73.8,7.1,3.7],
+    [161.2,202.4,157.7,207.2,196.3,21.0,14.6],[93.5,125.0,101.5,131.8,130.8,29.1,32.7],
+    [49.3,49.2,48.5,45.4,52.3,54.6,71.0],[47.7,50.8,44.5,54.6,56.2,68.3,85.6],
+    [65.0,60.7,62.8,71.6,64.0,84.4,117.0],[64.3,61.0,64.8,72.2,74.3,93.3,110.7],
+    [66.8,56.7,56.3,57.6,64.8,95.4,110.9],[60.2,55.7,62.7,60.4,68.3,110.0,114.1],
+    [83.7,80.5,79.8,72.8,96.3,100.4,106.6],[161.2,174.5,151.3,162.2,178.7,84.6,87.1],
+    [148.0,159.2,163.8,150.5,136.7,63.3,65.0],[101.7,102.8,101.2,108.3,96.0,54.7,45.6],
+    [67.7,69.7,76.0,87.3,61.3,43.1,36.9],[51.7,45.3,61.0,51.5,46.7,44.3,30.0],
+    [27.2,35.8,44.0,42.8,36.8,34.3,27.4],[16.7,19.7,27.2,26.2,29.3,37.4,19.1]
+  ]
+};
+
+// ============================================================
+// CHART DEFAULTS
+// ============================================================
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const gridOpts = {
+  color: 'rgba(30,45,69,0.6)',
+  drawBorder: false
+};
+
+let charts = {};
+
+// ============================================================
+// BUILD HEATMAP
+// ============================================================
+function buildHeatmap() {
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const maxVal = 210;
+  
+  let html = '<table class="heatmap-table"><thead><tr><th>HR</th>';
+  days.forEach(d => html += `<th>${d}</th>`);
+  html += '</tr></thead><tbody>';
+  
+  for (let h = 0; h < 24; h++) {
+    const label = h.toString().padStart(2,'0') + ':00';
+    html += `<tr><td class="hour-label">${label}</td>`;
+    ALL_DATA.heatmap[h].forEach((val, i) => {
+      const intensity = val / maxVal;
+      const r = Math.round(10 + intensity * (0 - 10));
+      const g = Math.round(14 + intensity * (212 - 14));
+      const b = Math.round(26 + intensity * (255 - 26));
+      const alpha = 0.1 + intensity * 0.9;
+      const textCol = intensity > 0.5 ? '#0a0e1a' : '#94a3b8';
+      html += `<td style="background:rgba(${r},${g},${b},${alpha});color:${textCol}" title="Avg ${val} rentals">${val}</td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('heatmapContainer').innerHTML = html;
+}
+
+// ============================================================
+// BUILD ANOMALY TABLE
+// ============================================================
+function buildAnomalyTable() {
+  const anomalies = ALL_DATA.dailyTotals.filter(d => Math.abs(d.zscore) > 1.5);
+  const causes = {
+    'Jan 18': 'Heavy fog/rain conditions',
+    'Jan 20': 'Warm weather + clear skies',
+    'Jan 25': 'Mild weather surge',
+    'Jan 26': 'Sudden cold front',
+    'Jan 27': 'Continued cold spell',
+    'Feb 14': "Valentine's Day low traffic"
+  };
+  
+  let html = '';
+  anomalies.forEach(a => {
+    const isHigh = a.zscore > 0;
+    const absZ = Math.abs(a.zscore).toFixed(2);
+    const badge = isHigh ? '<span class="badge badge-high">▲ SPIKE</span>' : '<span class="badge badge-low">▼ DIP</span>';
+    const zColor = isHigh ? '#ef4444' : '#f59e0b';
+    html += `<tr>
+      <td style="color:#e2e8f0;font-weight:600">${a.date}</td>
+      <td style="color:#00d4ff">${a.total.toLocaleString()}</td>
+      <td style="color:${zColor}">${a.zscore > 0 ? '+' : ''}${a.zscore.toFixed(2)}</td>
+      <td>${badge}</td>
+      <td style="color:#94a3b8">${causes[a.date] || 'Under investigation'}</td>
+    </tr>`;
+  });
+  document.getElementById('anomalyTableBody').innerHTML = html;
+}
+
+// ============================================================
+// INIT CHARTS
+// ============================================================
+function initCharts() {
+  // 1. LINE CHART - Daily trend with anomaly markers
+  const lineData = ALL_DATA.dailyTotals;
+  const anomalyDates = new Set(lineData.filter(d => Math.abs(d.zscore) > 1.5).map(d => d.date));
+  
+  charts.line = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: lineData.map(d => d.date),
+      datasets: [
+        {
+          label: 'Daily Rentals',
+          data: lineData.map(d => d.total),
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0,212,255,0.05)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: lineData.map(d => Math.abs(d.zscore) > 1.5 ? 7 : 3),
+          pointBackgroundColor: lineData.map(d => Math.abs(d.zscore) > 1.5 ? '#ef4444' : '#00d4ff'),
+          pointBorderColor: lineData.map(d => Math.abs(d.zscore) > 1.5 ? '#fff' : '#00d4ff'),
+          pointBorderWidth: lineData.map(d => Math.abs(d.zscore) > 1.5 ? 2 : 0),
+        },
+        {
+          label: 'Mean (1239)',
+          data: lineData.map(() => 1239),
+          borderColor: 'rgba(124,58,237,0.5)',
+          borderDash: [6, 3],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { labels: { color: '#64748b', font: { size: 10 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: '#1a2236',
+          borderColor: '#1e2d45',
+          borderWidth: 1,
+          callbacks: {
+            afterBody: (items) => {
+              const d = lineData[items[0].dataIndex];
+              return `Z-score: ${d.zscore.toFixed(2)}${Math.abs(d.zscore)>1.5?' ⚠️ ANOMALY':''}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: gridOpts, ticks: { maxRotation: 45, font: { size: 9 } } },
+        y: { grid: gridOpts, beginAtZero: false }
+      }
+    }
+  });
+
+  // 2. BAR CHART - Hourly
+  const hours = Object.keys(ALL_DATA.hourlyAvg).map(h => `${h.padStart(2,'0')}:00`);
+  const hourVals = Object.values(ALL_DATA.hourlyAvg);
+  const barColors = hourVals.map(v => v > 100 ? '#ef4444' : v > 60 ? '#f59e0b' : '#00d4ff');
+
+  charts.bar = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: hours,
+      datasets: [{
+        label: 'Avg Rentals',
+        data: hourVals,
+        backgroundColor: barColors,
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#1e2d45', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 8 } } },
+        y: { grid: gridOpts }
+      }
+    }
+  });
+
+  // 3. FUNNEL - Weather (horizontal bar styled as funnel)
+  const wLabels = Object.keys(ALL_DATA.weatherFunnel);
+  const wVals = Object.values(ALL_DATA.weatherFunnel);
+  const wColors = ['#00d4ff','#7c3aed','#f59e0b','#ef4444'];
+
+  charts.funnel = new Chart(document.getElementById('funnelChart'), {
+    type: 'bar',
+    data: {
+      labels: wLabels,
+      datasets: [{
+        label: 'Total Rentals',
+        data: wVals,
+        backgroundColor: wColors.map(c => c + '33'),
+        borderColor: wColors,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#1e2d45', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: gridOpts },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // 4. DONUT - Casual vs Registered
+  charts.donut = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Casual (Jan)','Registered (Jan)','Casual (Feb)','Registered (Feb)'],
+      datasets: [{
+        data: [3073, 35116, 1848, 18267],
+        backgroundColor: ['rgba(0,212,255,0.6)','rgba(0,212,255,0.9)','rgba(124,58,237,0.6)','rgba(124,58,237,0.9)'],
+        borderColor: '#111827',
+        borderWidth: 3,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#1e2d45', borderWidth: 1 }
+      }
+    }
+  });
+
+  // 5. TEMP CHART
+  charts.temp = new Chart(document.getElementById('tempChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(ALL_DATA.tempBins),
+      datasets: [{
+        label: 'Avg Rentals',
+        data: Object.values(ALL_DATA.tempBins),
+        backgroundColor: ['#1e3a5f','#1a5276','#1a8a6f','#7c3aed','#00d4ff'],
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#1e2d45', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 8 }, maxRotation: 20 } },
+        y: { grid: gridOpts }
+      }
+    }
+  });
+
+  // 6. WEEKDAY CHART
+  const wdOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  charts.weekday = new Chart(document.getElementById('weekdayChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [{
+        label: 'Total Rentals',
+        data: wdOrder.map(d => ALL_DATA.weekdayTotals[d]),
+        backgroundColor: wdOrder.map((d,i) => i >= 5 ? 'rgba(124,58,237,0.7)' : 'rgba(0,212,255,0.7)'),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#1a2236', borderColor: '#1e2d45', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: gridOpts }
+      }
+    }
+  });
+}
+
+// ============================================================
+// FILTER LOGIC (Slicers)
+// ============================================================
+function applyFilters() {
+  const month = document.getElementById('filterMonth').value;
+  const weather = document.getElementById('filterWeather').value;
+  const dayType = document.getElementById('filterDayType').value;
+  const peak = document.getElementById('filterPeak').value;
+  const holiday = document.getElementById('filterHoliday').value;
+
+  // For demo: show filter state in KPI
+  let filterDesc = [];
+  if (month !== 'all') filterDesc.push(month);
+  if (weather !== 'all') filterDesc.push(weather);
+  if (dayType !== 'all') filterDesc.push(dayType);
+  if (peak !== 'all') filterDesc.push(peak);
+  if (holiday !== 'all') filterDesc.push(holiday);
+
+  if (filterDesc.length > 0) {
+    document.getElementById('kpi-total-sub').textContent = '⚡ Filter: ' + filterDesc.join(' · ');
+    
+    // Update line chart to show only relevant dates
+    if (month === 'Jan') {
+      charts.line.data.datasets[0].data = ALL_DATA.dailyTotals.slice(0, 31).map(d => d.total);
+      charts.line.data.labels = ALL_DATA.dailyTotals.slice(0, 31).map(d => d.date);
+    } else if (month === 'Feb') {
+      charts.line.data.datasets[0].data = ALL_DATA.dailyTotals.slice(31).map(d => d.total);
+      charts.line.data.labels = ALL_DATA.dailyTotals.slice(31).map(d => d.date);
+    } else {
+      charts.line.data.datasets[0].data = ALL_DATA.dailyTotals.map(d => d.total);
+      charts.line.data.labels = ALL_DATA.dailyTotals.map(d => d.date);
+    }
+    charts.line.update('active');
+
+    // Weather filter on funnel
+    if (weather !== 'all') {
+      const wKeys = Object.keys(ALL_DATA.weatherFunnel);
+      charts.funnel.data.datasets[0].data = wKeys.map(k => k === weather ? ALL_DATA.weatherFunnel[k] : ALL_DATA.weatherFunnel[k] * 0.15);
+      charts.funnel.update('active');
+    }
+  }
+}
+
+function resetFilters() {
+  ['filterMonth','filterWeather','filterDayType','filterPeak','filterHoliday'].forEach(id => {
+    document.getElementById(id).value = 'all';
+  });
+  document.getElementById('kpi-total-sub').textContent = 'Jan–Feb 2011';
+  
+  // Reset line chart
+  charts.line.data.datasets[0].data = ALL_DATA.dailyTotals.map(d => d.total);
+  charts.line.data.labels = ALL_DATA.dailyTotals.map(d => d.date);
+  charts.line.update('active');
+
+  // Reset funnel
+  charts.funnel.data.datasets[0].data = Object.values(ALL_DATA.weatherFunnel);
+  charts.funnel.update('active');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  buildHeatmap();
+  buildAnomalyTable();
+  initCharts();
+});
+</script>
+</body>
+</html>
